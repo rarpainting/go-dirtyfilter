@@ -126,7 +126,7 @@ func (nf *nodeFilter) FilterReaderResult(reader io.Reader, excludes ...rune) (ma
 		if nf.checkExclude(ur, excludes...) {
 			continue
 		}
-		if (unicode.IsSpace(ur) || unicode.IsPunct(ur)) && len(uchars) > 0 {
+		if unicode.IsSpace(ur) && len(uchars) > 0 {
 			nf.doFilter(uchars[:], data)
 			uchars = nil
 			continue
