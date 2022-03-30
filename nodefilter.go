@@ -3,6 +3,7 @@ package filter
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"unicode"
 
 	"io"
@@ -258,4 +259,61 @@ func (nf *nodeFilter) appendTo(dst, src []int) []int {
 		}
 	}
 	return append(dst, t...)
+}
+
+func (nf *nodeFilter) FilterWithPunct(text string, excludes ...rune) ([]string, error) {
+	buf := bytes.NewBufferString(text)
+	defer buf.Reset()
+	return nf.FilterReaderWithPunct(buf, excludes...)
+}
+
+func (nf *nodeFilter) FilterReaderWithPunct(reader io.Reader, excludes ...rune) ([]string, error) {
+	data, err := nf.FilterReaderResultWithPunct(reader, excludes...)
+	if err != nil {
+		return nil, err
+	}
+	var result []string
+	for k := range data {
+		result = append(result, k)
+	}
+	return result, nil
+}
+
+func (nf *nodeFilter) FilterReaderResultWithPunct(reader io.Reader, excludes ...rune) (map[string]int, error) {
+	var (
+		uchars []rune
+	)
+	data := make(map[string]int)
+	bi := bufio.NewReader(reader)
+	for {
+		ur, _, err := bi.ReadRune()
+		if err != nil {
+			if err != io.EOF {
+				return nil, err
+			}
+			break
+		}
+		if nf.checkExclude(ur, excludes...) {
+			continue
+		}
+		if unicode.IsSpace(ur) && len(uchars) > 0 {
+			nf.doFilter(uchars[:], data)
+			uchars = nil
+			continue
+		}
+		uchars = append(uchars, ur)
+	}
+	if len(uchars) > 0 {
+		nf.doFilter(uchars, data)
+	}
+	return data, nil
+}
+
+func FilterWithPunct(filter DirtyFilter, text string, excludes ...rune) ([]string, error) {
+	nodeF, ok := filter.(*nodeFilter)
+	if !ok {
+		return nil, errors.New("unsupported instance")
+	}
+
+	return nodeF.FilterWithPunct(text, excludes...)
 }
